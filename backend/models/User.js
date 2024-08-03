@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
     },
     dob: {
         type: Date,
-        required: true
+        required: false
     }
 });
 

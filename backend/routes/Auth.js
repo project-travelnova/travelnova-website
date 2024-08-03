@@ -3,10 +3,37 @@ const passport = require('passport');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
+
+// Function to create a token
+function createToken(user) {
+    const payload = {
+        id: user._id,
+        name: user.name,
+        email: user.email
+    };
+
+    return jwt.sign(payload, 'your_jwt_secret', { expiresIn: '1h' });
+}
+
 // Local Auth Routes
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 
+const ensureAuth = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, 'your_jwt_secret');
+        req.user = await User.findById(decoded.id).select('-password');
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: 'Invalid token' });
+    }
+};
 // Signup
 router.post('/signup', async (req, res) => {
     const { name, email, password, dob } = req.body;
@@ -53,7 +80,7 @@ router.get(
     '/google/callback',
     passport.authenticate('google', { failureRedirect: '/login' }),
     (req, res) => {
-        const token = jwt.sign({ id: req.user._id }, 'your_jwt_secret', { expiresIn: '1h' });
+        const token = createToken(req.user);
         res.redirect(`http://localhost:3000/auth/success?token=${token}`);
     }
 );
@@ -65,9 +92,12 @@ router.get(
     '/facebook/callback',
     passport.authenticate('facebook', { failureRedirect: '/login' }),
     (req, res) => {
-        const token = jwt.sign({ id: req.user._id }, 'your_jwt_secret', { expiresIn: '1h' });
+        const token = createToken(req.user);
         res.redirect(`http://localhost:3000/auth/success?token=${token}`);
     }
 );
 
-module.exports = router;
+module.exports = {
+    ensureAuth,
+    router
+};
