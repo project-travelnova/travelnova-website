@@ -54,7 +54,12 @@ const blogSchema = new mongoose.Schema({
             ref: 'Comment',
             required: false
         }
-    ]
+    ],
+    tag: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Tag',
+        required: true
+    }
 });
 
 const Blog = mongoose.model('Blog', blogSchema);

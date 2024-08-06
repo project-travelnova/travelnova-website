@@ -2,7 +2,9 @@ const express = require('express');
 const passport = require('passport');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 // Function to create a token
 function createToken(user) {
@@ -12,28 +14,21 @@ function createToken(user) {
         email: user.email
     };
 
-    return jwt.sign(payload, process.env.JWT_SECRET,  { expiresIn: '1h' });
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 }
-
-// Local Auth Routes
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
 
 const ensureAuth = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
-
     if (!token) {
-        console.log('No token provided'); // Debug log
         return res.status(401).json({ message: 'No token provided' });
     }
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('Decoded Token:', decoded); // Debug log
         req.user = await User.findById(decoded.id).select('-password');
         next();
     } catch (err) {
-        console.log('Token verification failed:', err); // Debug log
+        console.error('JWT verification failed:', err);
         return res.status(401).json({ message: 'Invalid token' });
     }
 };
@@ -68,7 +63,6 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ email });
         if (user && (await user.matchPassword(password))) {
             const token = createToken(user);
-            console.log('User after login:', user); // Debug log
             res.json({ user, token });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
@@ -80,10 +74,15 @@ router.post('/login', async (req, res) => {
 
 // Google Auth
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/login' }), (req, res) => {
-    const token = createToken(req.user);
-    res.redirect(`http://localhost:3000/auth/success?token=${token}`);
-});
+
+router.get(
+    '/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login' }),
+    (req, res) => {
+        const token = createToken(req.user);
+        res.redirect(`http://localhost:3000/auth/success?token=${token}`);
+    }
+);
 
 // Facebook Auth
 router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
@@ -96,6 +95,29 @@ router.get(
         res.redirect(`http://localhost:3000/auth/success?token=${token}`);
     }
 );
+
+// Update user profile
+router.put('/profile', ensureAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.name = req.body.name || user.name;
+        user.email = req.body.email || user.email;
+        user.dob = req.body.dob || user.dob;
+        user.gender = req.body.gender || user.gender;
+        user.bio = req.body.bio || user.bio;
+        user.instagram = req.body.instagram || user.instagram;
+
+        const updatedUser = await user.save();
+        res.json(updatedUser);
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 module.exports = {
     ensureAuth,

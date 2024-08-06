@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const Blog = require('../models/Blog');
+const Tag = require('../models/tag');
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
+const { ensureAuth } = require('../routes/auth');
 
-// Function to create a token
 function createToken(user) {
     const payload = {
         id: user._id,
@@ -12,7 +13,7 @@ function createToken(user) {
         email: user.email
     };
 
-    return jwt.sign(payload, process.env.JWT_SECRET,  { expiresIn: '1h' });
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 }
 
 // Set up multer for image uploads
@@ -34,31 +35,36 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-const upload = multer({ 
-    storage: storage,
-    fileFilter: fileFilter
-});
+const upload = multer({ storage: storage, fileFilter: fileFilter });
 
 // Create a new blog post
-router.post('/', upload.single('image'), async (req, res) => {
-    const { title, description, author, date } = req.body;
+router.post('/', ensureAuth, upload.single('image'), async (req, res) => {
+    const { title, description, author, date, tag } = req.body;
     const image = req.file ? req.file.path : null;
 
-    const blog = new Blog({
-        title,
-        description,
-        author,
-        date,
-        image
-    });
-
     try {
+        const tagDoc = await Tag.findById(tag);
+        if (!tagDoc) {
+            return res.status(404).json({ message: 'Tag not found' });
+        }
+
+        const blog = new Blog({
+            title,
+            description,
+            author,
+            date,
+            image,
+            tag: tagDoc._id
+        });
+
         const newBlog = await blog.save();
         res.status(201).json(newBlog);
     } catch (err) {
         res.status(400).json({ message: err.message });
     }
 });
+
+
 
 // Get all blogs
 router.get('/', async (req, res) => {
@@ -70,6 +76,8 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: 'Internal Server Error' });
     }
 });
+
+
 
 router.get('/:id', async (req, res) => {
     try {
@@ -89,14 +97,11 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Get a single blog by ID
-router.get('/:id', async (req, res) => {
+// Get blogs by tag
+router.get('/tag/:tagId', async (req, res) => {
     try {
-        const blog = await Blog.findById(req.params.id);
-        if (!blog) {
-            return res.status(404).json({ message: 'Cannot find blog' });
-        }
-        res.json(blog);
+        const blogs = await Blog.find({ tag: req.params.tagId }).populate('tag');
+        res.json(blogs);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -140,7 +145,6 @@ const verifyToken = (req) => {
         return null;
     }
 };
-
 
 // Delete a blog post
 router.delete('/:id', async (req, res) => {

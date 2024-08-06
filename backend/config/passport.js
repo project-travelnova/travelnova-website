@@ -3,6 +3,16 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
 const User = require('../models/User');
 
+const createToken = (user) => {
+    const payload = {
+        id: user._id,
+        name: user.name,
+        email: user.email
+    };
+
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+};
+
 passport.use(
     new GoogleStrategy(
         {

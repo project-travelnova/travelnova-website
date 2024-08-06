@@ -18,6 +18,18 @@ const userSchema = new mongoose.Schema({
     dob: {
         type: Date,
         required: false
+    },
+    gender: {
+        type: String,
+        required: false
+    },
+    bio: {
+        type: String,
+        required: false
+    },
+    instagram: {
+        type: String,
+        required: false
     }
 });
 

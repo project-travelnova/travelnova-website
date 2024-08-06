@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -6,12 +7,11 @@ const passport = require('passport');
 const blogRoutes = require('./routes/blogs');
 const authRoutes = require('./routes/auth');
 const commentsRouter = require('./routes/comments');
-const contactRouter = require('./routes/contact'); // Add this line
+const contactRouter = require('./routes/contact');
+const tagsRouter = require('./routes/tags');
 const app = express();
 const port = process.env.PORT || 5000;
-
-require('dotenv').config();
-
+const userRoutes = require('./routes/users');
 
 // Middleware
 app.use(cors());
@@ -29,12 +29,13 @@ mongoose.connect('mongodb://localhost:27017/travelnova', { useNewUrlParser: true
     .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
-
 app.use('/api', authRoutes.router);
 app.use('/api/auth', authRoutes.router);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/comments', commentsRouter);
-app.use('/api/contact', contactRouter); // Add this line
+app.use('/api/contact', contactRouter);
+app.use('/api/tags', tagsRouter);
+app.use('/api/users', userRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
