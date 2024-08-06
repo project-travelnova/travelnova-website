@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const Blog = require('../models/Blog');
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
+
+// Function to create a token
+function createToken(user) {
+    const payload = {
+        id: user._id,
+        name: user.name,
+        email: user.email
+    };
+
+    return jwt.sign(payload, process.env.JWT_SECRET,  { expiresIn: '1h' });
+}
 
 // Set up multer for image uploads
 const storage = multer.diskStorage({
@@ -59,6 +71,24 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/:id', async (req, res) => {
+    try {
+        const blog = await Blog.findById(req.params.id).populate({
+            path: 'comments',
+            populate: {
+                path: 'user',
+                select: 'name'
+            }
+        });
+        if (!blog) {
+            return res.status(404).json({ message: 'Cannot find blog' });
+        }
+        res.json(blog);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // Get a single blog by ID
 router.get('/:id', async (req, res) => {
     try {
@@ -95,17 +125,46 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     }
 });
 
+// Function to verify JWT token
+const verifyToken = (req) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        console.error('No token provided');
+        return null;
+    }
+
+    try {
+        return jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+        console.error('JWT verification failed:', err);
+        return null;
+    }
+};
+
+
 // Delete a blog post
 router.delete('/:id', async (req, res) => {
     try {
+        console.log('Delete request received');
         const blog = await Blog.findById(req.params.id);
         if (!blog) {
+            console.error('Blog not found');
             return res.status(404).json({ message: 'Cannot find blog' });
         }
 
-        await blog.remove();
-        res.json({ message: 'Blog post deleted' });
+        const decoded = verifyToken(req);
+        console.log('Decoded token:', decoded); // Log decoded token
+        console.log('Blog author:', blog.author); // Log blog author
+
+        if (!decoded || decoded.name !== blog.author) {
+            console.error('Access denied');
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        await Blog.deleteOne({ _id: req.params.id });
+        res.json({ message: 'Blog deleted' });
     } catch (err) {
+        console.error('Error deleting blog:', err); // Log error
         res.status(500).json({ message: err.message });
     }
 });

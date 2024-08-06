@@ -12,7 +12,7 @@ function createToken(user) {
         email: user.email
     };
 
-    return jwt.sign(payload, 'your_jwt_secret', { expiresIn: '1h' });
+    return jwt.sign(payload, process.env.JWT_SECRET,  { expiresIn: '1h' });
 }
 
 // Local Auth Routes
@@ -23,17 +23,21 @@ const ensureAuth = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
+        console.log('No token provided'); // Debug log
         return res.status(401).json({ message: 'No token provided' });
     }
 
     try {
-        const decoded = jwt.verify(token, 'your_jwt_secret');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('Decoded Token:', decoded); // Debug log
         req.user = await User.findById(decoded.id).select('-password');
         next();
     } catch (err) {
+        console.log('Token verification failed:', err); // Debug log
         return res.status(401).json({ message: 'Invalid token' });
     }
 };
+
 // Signup
 router.post('/signup', async (req, res) => {
     const { name, email, password, dob } = req.body;
@@ -63,7 +67,8 @@ router.post('/login', async (req, res) => {
     try {
         const user = await User.findOne({ email });
         if (user && (await user.matchPassword(password))) {
-            const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
+            const token = createToken(user);
+            console.log('User after login:', user); // Debug log
             res.json({ user, token });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
@@ -75,15 +80,10 @@ router.post('/login', async (req, res) => {
 
 // Google Auth
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-router.get(
-    '/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login' }),
-    (req, res) => {
-        const token = createToken(req.user);
-        res.redirect(`http://localhost:3000/auth/success?token=${token}`);
-    }
-);
+router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/login' }), (req, res) => {
+    const token = createToken(req.user);
+    res.redirect(`http://localhost:3000/auth/success?token=${token}`);
+});
 
 // Facebook Auth
 router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));

@@ -7,9 +7,11 @@ const blogRoutes = require('./routes/blogs');
 const authRoutes = require('./routes/auth');
 const commentsRouter = require('./routes/comments');
 const contactRouter = require('./routes/contact'); // Add this line
-
 const app = express();
 const port = process.env.PORT || 5000;
+
+require('dotenv').config();
+
 
 // Middleware
 app.use(cors());
